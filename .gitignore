@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
+env/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE files
+.vscode/
+*.idea/
+*.iml
+
+# Flask environment
+instance/
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# Byte-compiled files
+*.pyc
+*.pyo
+*.pyd
+
+# Configuration files
+.env
+
+# Local development settings
+.local/
+
+# Dependency directories
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Compiled source
+*.com
+*.clas
