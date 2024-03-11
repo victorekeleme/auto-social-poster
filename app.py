@@ -11,7 +11,6 @@ import uuid  # Import the uuid module
 
 
 app = Flask(__name__)
-# app.secret_key = '_5#y2L"F4Q8z\n\xec]/'
 app.config['SECRET_KEY'] = '_5#y2L"F4Q8z\n\xec]/'
 socketio = SocketIO(app)
 
