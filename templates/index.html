@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document Converter</title>
+    <title>Auto-Social Poster</title>
     <!-- Add Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
     <!-- <script src="{{ url_for('static', filename='script.js') }}"></script> -->
@@ -11,7 +11,7 @@
 <body>
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <a class="navbar-brand" href="#">Document Converter</a>
+        <a class="navbar-brand" href="#">Auto-Social Poster</a>
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -19,6 +19,9 @@
             <ul class="navbar-nav ml-auto">
                 <li class="nav-item active">
                     <a class="nav-link" href="{{ url_for('index') }}">Home <span class="sr-only">(current)</span></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('about') }}">About us</a>
@@ -39,77 +42,159 @@
                 <p id="flash-message" class="alert alert-info">{{ message }}</p>
                 {% endfor %}
             {% endif %}
-
         {% endwith %}
         
-        <ul class="list-group">
-            {% for file in files %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    {{ file.filename }}
-                    <div class="btn-group">
-                        <!-- Dropdown menu for file format selection -->
-                        <div class="dropdown ml-2">
-                            <button class="btn btn-secondary dropdown-toggle" type="button" id="formatDropdown{{ file.id }}" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" data-file-id="{{ file.id }}">
-                                Format
-                            </button>
-                            <div class="dropdown-menu" aria-labelledby="formatDropdown{{ file.id }}" data-file-id="{{ file.id }}">
-                                <a class="dropdown-item" href="#" data-format="pdf">PDF</a>
-                                <a class="dropdown-item" href="#" data-format="docx">DOCX</a>
-                                <a class="dropdown-item" href="#" data-format="txt">TXT</a>
-                                <!-- Add more formats as needed -->
+        <!-- Create Post button -->
+        <div class="mb-3">
+            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addPostModal">
+                Create Post
+            </button>
+        </div>
+
+       <!-- Tab navigation -->
+       <ul class="nav nav-tabs" id="postTabs" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="unpublished-tab" data-toggle="tab" href="#unpublished" role="tab" aria-controls="unpublished" aria-selected="true">Unpublished</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="published-tab" data-toggle="tab" href="#published" role="tab" aria-controls="published" aria-selected="false">Published</a>
+            </li>
+        </ul>
+
+        <!-- Tab content -->
+        <div class="tab-content mt-3" id="postTabContent">
+            <div class="tab-pane fade show active" id="unpublished" role="tabpanel" aria-labelledby="unpublished-tab">
+                <!-- Display unpublished posts here -->
+                <ul class="list-group">
+                    {% for post in unpublished_posts %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <p>{{ post.post_text }}</p>
+                            {% if post.post_media_link %}
+                            <a href="{{ post.post_media_link }}">"{{ post.post_media_link }}"</a>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <!-- Button group to align buttons on the right -->
+                            <div class="btn-group" role="group">
+                                <!-- Post button -->
+                                <button type="button" class="btn btn-success btn-sm delete-btn mr-2 mb-1" data-post-id="{{ post.id }}" onclick="sendPost('{{ post.id }}')">Post</button>
+                                <!-- Edit button -->
+                                <button type="button" class="btn btn-primary mr-2 mb-1" onclick="openEditModal('{{ post.id }}', '{{ post.post_text }}')">Edit</button>
+                                <!-- <a href="#" class="btn btn-primary btn-sm convert-btn mr-1" data-post-id="{{ post.id }}" aria-labelledby="convert-label-{{ post.id }}">Edit</a> -->
+                                <!-- Delete button -->
+                                <button type="button" class="btn btn-danger btn-sm delete-btn mb-1" data-post-id="{{ post.id }}" onclick="deletePost('{{ post.id }}')">Delete</button>
                             </div>
                         </div>
-        
-                        <!-- Convert button -->
-                        <a href="#" class="btn btn-success btn-sm convert-btn ml-2" data-file-id="{{ file.id }}" aria-labelledby="convert-label-{{ file.id }}">Convert</a>
-                        <!-- For deletion -->
-                        <a href="{{ url_for('delete', file_id=file.id) }}" class="btn btn-danger btn-sm delete-btn ml-2" data-file-id="{{ file.id }}" aria-labelledby="delete-label-{{ file.id }}">Delete</a>
-                    </div>
-                </li>
-            {% endfor %}
-        </ul>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <!-- Message for no unpublished posts -->
+                <p id="noUnpublishedPosts" class="text-muted">No unpublished posts</p>
+            </div>
+            <div class="tab-pane fade" id="published" role="tabpanel" aria-labelledby="published-tab">
+                <!-- Display published posts here -->
+                <ul class="list-group">
+                    {% for post in published_posts %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <p>{{ post.post_text }}</p>
+                            {% if post.post_media_link %}
+                            <a href="{{ post.post_media_link }}">"{{ post.post_media_link }}"</a>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <!-- Button group to align buttons on the right -->
+                            <div class="btn-group" role="group">
+                                <!-- Post button -->
+                                <button type="button" class="btn btn-success btn-sm delete-btn mr-2 mb-1" data-post-id="{{ post.id }}" onclick="sendPost('{{ post.id }}')">Post</button>
+                                <!-- Edit button -->
+                                <button type="button" class="btn btn-primary mr-2 mb-1" onclick="openEditModal('{{ post.id }}', '{{ post.post_text }}')">Edit</button>
+                                <!-- <a href="#" class="btn btn-primary btn-sm convert-btn mr-1" data-post-id="{{ post.id }}" aria-labelledby="convert-label-{{ post.id }}">Edit</a> -->
+                                <!-- Delete button -->
+                                <button type="button" class="btn btn-danger btn-sm delete-btn mb-1" data-post-id="{{ post.id }}" onclick="deletePost('{{ post.id }}')">Delete</button>
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <!-- Message for no published posts -->
+                <p id="noPublishedPosts" class="text-muted">No published posts</p>
+            </div>
+        </div>
 
-        <!-- Add this input field to the form in index.html -->
-        <form action="/add" method="post" class="mt-3" enctype="multipart/form-data">
-            <!-- New input field for file upload -->
-            <div class="input-group">
-                <div class="custom-file">
-                    <input type="file" class="custom-file-input" id="file" name="file" aria-describedby="inputGroupFileAddon01" onchange="displayFileName()" >
-                    <label class="custom-file-label" for="file" id="file-label">Choose file</label>
-                </div>
-                <div class="input-group-append">
-                    <button type="submit" id="submit_file" class="btn btn-primary" aria-label="Add File">Add File</button>
+                
+        <!-- Create Post Modal -->
+        <div class="modal fade" id="addPostModal" tabindex="-1" role="dialog" aria-labelledby="addPostModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addPostModalLabel">Create Post</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <form id="addPostForm" enctype="multipart/form-data">
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="post-text">Post Text</label>
+                                <textarea class="form-control" id="post-text" name="post_text" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="post-media">Upload Media</label>
+                                <input type="file" class="form-control-file" id="post-media" name="post_media">
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <button type="button" class="btn btn-primary" onclick="submitAddForm()">Add Post</button>
+                        </div>
+                    </form>
                 </div>
             </div>
-        </form>
+        </div>
 
-        <br>
-        <br>
-
-        {% if outputs %}
-        <h1 class="mt-4">Converted Files</h1>
-        <ul class="list-group">
-            {% for file in outputs %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    {{ file.filename }}
-                    <div class="btn-group">
-                        <!-- For Downloading -->
-                        <a href="{{ url_for('download', file_id=file.id) }}" class="btn btn-primary btn-sm download-btn ml-2" data-file-id="{{ file.id }}" aria-labelledby="download-label-{{ file.id }}">Download</a>
-                        <!-- For deletion -->
-                        <a href="{{ url_for('delete_converted', file_id=file.id) }}" class="btn btn-danger btn-sm delete-btn ml-2" data-file-id="{{ file.id }}" aria-labelledby="delete-converted-label-{{ file.id }}">Delete</a>
+        <!-- Edit Post Modal -->
+        <div class="modal fade" id="editPostModal" tabindex="-1" role="dialog" aria-labelledby="editPostModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editPostModalLabel">Edit Post</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
                     </div>
-                </li>
-            {% endfor %}
-        </ul>
-        {% endif %}
+                    <div class="modal-body">
+                        <form id="editPostForm" method="POST" enctype="multipart/form-data">
+                            <input type="hidden" id="editPostId" name="post_id">
+                            <div class="form-group">
+                                <label for="edit_post_text">Post Text</label>
+                                <textarea class="form-control" id="edit_post_text" name="post_text" rows="3"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit_post_media">Upload Media</label>
+                                <input type="file" class="form-control-file" id="edit_post_media" name="post_media">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" onclick="submitEditForm()">Update Post</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- Add Bootstrap JS and Popper.js (required for some Bootstrap components) -->
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <!-- <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script> -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
     <!-- Add Flask-SocketIO JS library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.0.4/socket.io.js"></script>
+
 
     <script>
         // Display the selected filename in the custom file input
@@ -121,148 +206,115 @@
 
         setTimeout(function () {
             var flashMessage = document.getElementById('flash-message');
-            // flashMessage.style.opacity = 0;
             flashMessage.style.display = 'none';
         }, 5000);
 
-        // Handle asynchronous file conversion using JavaScript
-        document.addEventListener('DOMContentLoaded', function () {
-            var convertButtons = document.querySelectorAll('.convert-btn');
-            convertButtons.forEach(function (button) {
-                button.addEventListener('click', function () {
-                    var fileId = this.getAttribute('data-file-id');
-                    convertFile(fileId);
-                });
-            });
+
+        // Show/hide add post form
+        $('#add-post-btn').click(function() {
+            $('#add-post-form').toggle();
         });
 
-        function convertFile(fileId) {
-            var convertButton = document.querySelector('.convert-btn[data-file-id="' + fileId + '"]');
-            convertButton.innerText = 'Converting...';
-            convertButton.disabled = true;
+        function submitAddForm() {
+        // Create FormData object to store form data
+        var formData = new FormData(document.getElementById('addPostForm'));
 
-            fetch('/convert/' + fileId, {
-                method: 'GET',
-            })
-            .then(response => {
-                if (response.ok) {
-                    console.log('Conversion started successfully');
-                } else {
-                    console.error('Error starting conversion');
+        // Send AJAX request to handle form submission
+        $.ajax({
+            type: 'POST',
+            url: '/add',
+            data: formData,
+            contentType: false,
+            processData: false,
+            success: function(response) {
+                // If successful, reload the page or update the post list dynamically
+                location.reload();
+            },
+            error: function(error) {
+                // Handle errors, if any
+                console.error('Error:', error);
+            }
+         });
+        }
+
+        // Function to open the edit modal and populate it with post data
+        function openEditModal(postId, postText) {
+            $('#editPostId').val(postId);
+            $('#edit_post_text').val(postText);
+            $('#editPostModal').modal('show');
+        }
+
+        // Function to handle form submission for editing
+        function submitEditForm() {
+            // Get form data
+            var formData = new FormData(document.getElementById('editPostForm'));
+
+            // Get the post ID
+            var postId = $('#editPostId').val();
+
+            // Send form data using AJAX
+            $.ajax({
+                type: 'POST',
+                url: '/edit/' + postId,
+                data: formData,
+                contentType: false,
+                processData: false,
+                success: function(response) {
+                    // Reload the page or update the post list dynamically
+                    location.reload();
+                },
+                error: function(error) {
+                    // Handle errors, if any
+                    console.error('Error:', error);
                 }
-            })
-            .catch(error => {
-                console.error('Error starting conversion:', error);
-            })
-            .finally(() => {
-                convertButton.innerText = 'Convert';
-                convertButton.disabled = false;
             });
         }
 
-        var socket = io.connect('http://' + document.domain + ':' + location.port);  // Connect to the SocketIO server
-        console.log('SocketIO connection established:', socket);
-        // Update flash message on SocketIO event
-        socket.on('flash_message', function (data) {
-            var currentUserID = "{{ user_id }}";
-            if (data.user_id === currentUserID){
-                updateFlashMessage(data.message, function() {
-                    // Delay the callback by 500 milliseconds (0.5 seconds)
-                    setTimeout(function() {
-                    // Reload the page or perform additional actions after the flash message
-                        window.location.reload(true);
-                    }, 200);
-                });
-            }
-        });
-
-        function updateFlashMessage(message, callback) {
-            // Find the container element by its ID using the user_id
-            var flashContainer = document.getElementById('flash-container');
-
-            if (!flashContainer) {
-                console.error('Flash container not found',);
-                return;
-            }
-
-            // Create a new <p> element for the flash message
-            var newFlashMessage = document.createElement('p');
-            newFlashMessage.className = 'alert alert-info';
-
-            // Set the message as the content of the new <p> element
-            newFlashMessage.innerText = message;
-            newFlashMessage.style.display = "block"
-
-            // Append the new <p> element to the container
-            flashContainer.appendChild(newFlashMessage);
-
-            // Set a timeout to remove the flash message after 5 seconds
-            setTimeout(function () {
-                newFlashMessage.style.display = 'none';
-                // Optionally, you can remove the element from the DOM after hiding
-                newFlashMessage.remove();
-
-                // Execute the callback after hiding the flash message
-                if (typeof callback === 'function') {
-                    callback();
+        // Function to handle post deletion
+        function deletePost(postId) {
+            // Send AJAX request to delete the post
+            $.ajax({
+                type: 'GET',
+                url: '/delete/' + postId,
+                success: function(response) {
+                    // Reload the page or update the post list dynamically
+                    location.reload();
+                },
+                error: function(error) {
+                    // Handle errors, if any
+                    console.error('Error:', error);
                 }
-            }, 5000);
+            });
         }
 
+        $(document).ready(function() {
+            // Display unpublished posts by default
+            displayPosts("unpublished");
 
-    document.addEventListener('DOMContentLoaded', function () {
-    // Select all dropdowns with the class 'dropdown'
-    var dropdowns = document.querySelectorAll('.dropdown');
-
-    dropdowns.forEach(function (dropdown) {
-        // Get all format buttons inside the current dropdown
-        var formatButtons = dropdown.querySelectorAll('.btn-secondary');
-
-        // Retrieve selected_format from sessionStorage on page load
-        formatButtons.forEach(function (formatButton) {
-            var fileId = formatButton.getAttribute('data-file-id');
-            var storedFormat = sessionStorage.getItem('selected_format_' + fileId);
-            if (storedFormat) {
-                // Apply the stored format to the corresponding button
-                formatButton.innerText = storedFormat;
-            }
-        });
-
-        // Loop through formatButtons
-        formatButtons.forEach(function (formatButton) {
-            // Your code for each formatButton goes here
-            var formatItems = dropdown.querySelectorAll('.dropdown-item');
-            
-            formatItems.forEach(function (item) {
-                item.addEventListener('click', function () {
-                    var selectedFormat = item.innerText.trim();
-                    var fileId = formatButton.getAttribute('data-file-id');
-                    formatButton.innerText = selectedFormat;
-
-                    // Save selected_format and fileId to sessionStorage
-                    sessionStorage.setItem('selected_format_' + fileId, selectedFormat);
-
-                    // Send the selected format to the Flask server
-                    fetch('/update_format', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/x-www-form-urlencoded',
-                        },
-                        body: 'selected_format=' + encodeURIComponent(selectedFormat) + '&file_id=' + encodeURIComponent(fileId),
-                    })
-                    .then(response => response.text())
-                    .then(data => {
-                        console.log(data);  // Log the server response
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                    });
-
-                });
+            // Handle tab clicks
+            $("#postTabs a").on("click", function(event) {
+                event.preventDefault();
+                var tab = $(this).attr("id").replace("-tab", "");
+                displayPosts(tab);
             });
         });
-    });
-});
+
+        // Function to display posts based on the selected tab
+        function displayPosts(tab) {
+            // Hide all posts and messages
+            $("#unpublishedPosts, #publishedPosts, #noUnpublishedPosts, #noPublishedPosts").hide();
+
+            // Show the selected tab content
+            $("#" + tab + "Posts").empty(); // Clear previous posts
+            var posts = tab === "unpublished" ? unpublishedPosts : publishedPosts;
+            if (posts.length > 0) {
+                $.each(posts, function(index, post) {
+                    $("#" + tab + "Posts").append('<li class="list-group-item">' + post.text + '</li>');
+                });
+            } else {
+                $("#no" + tab.charAt(0).toUpperCase() + tab.slice(1) + "Posts").show();
+            }
+        }
 
     </script>
 </body>

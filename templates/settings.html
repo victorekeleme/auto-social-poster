@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Auto-Social Poster</title>
+    <!-- Add Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="#">Auto-Social Poster</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item active">
+                    <a class="nav-link" href="{{ url_for('index') }}">Home <span class="sr-only">(current)</span></a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('about') }}">About us</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <h2>Settings</h2>
+        <ul class="nav nav-tabs" id="settingsTab" role="tablist">
+            <li class="nav-item">
+                <a class="nav-link active" id="schedule-tab" data-toggle="tab" href="#schedule" role="tab" aria-controls="schedule" aria-selected="true">Schedule</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" id="accounts-tab" data-toggle="tab" href="#accounts" role="tab" aria-controls="accounts" aria-selected="false">Accounts</a>
+            </li>
+        </ul>
+        <div class="tab-content" id="settingsTabContent">
+            <div class="tab-pane fade show active" id="schedule" role="tabpanel" aria-labelledby="schedule-tab">
+                <form>
+                    <div class="form-group">
+                        <label for="postsPerDay">Posts per day</label>
+                        <input type="number" class="form-control" id="postsPerDay" name="postsPerDay">
+                    </div>
+                    <div class="form-group">
+                        <label>Weekly schedule</label><br>
+
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="sunday" name="weeklySchedule" value="Sunday">
+                                <label class="form-check-label" for="sunday">Sunday</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="monday" name="weeklySchedule" value="Monday">
+                                <label class="form-check-label" for="monday">Monday</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="tuesday" name="weeklySchedule" value="Tuesday">
+                                <label class="form-check-label" for="tuesday">Tuesday</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="wednesday" name="weeklySchedule" value="Wednesday">
+                                <label class="form-check-label" for="wednesday">Wednesday</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="thursday" name="weeklySchedule" value="Thursday">
+                                <label class="form-check-label" for="thursday">Thursday</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="friday" name="weeklySchedule" value="Friday">
+                                <label class="form-check-label" for="friday">Friday</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="saturday" name="weeklySchedule" value="Saturday">
+                                <label class="form-check-label" for="saturday">Saturday</label>
+                            </div>
+                        </div>
+                        
+                    </div>
+                    <div class="form-group">
+                        <label for="recyclePostAfter">Recycle Post After (days)</label>
+                        <input type="number" class="form-control" id="recyclePostAfter" name="recyclePostAfter">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </form>
+            </div>
+            <div class="tab-pane fade" id="accounts" role="tabpanel" aria-labelledby="accounts-tab">
+                <h4>Connect Accounts</h4>
+                <button type="button" class="btn btn-primary" id="facebookBtn">Connect with Facebook</button>
+                <button type="button" class="btn btn-info" id="twitterBtn">Connect with Twitter</button>
+                <button type="button" class="btn btn-danger" id="instagramBtn">Connect with Instagram</button>
+                <button type="button" class="btn btn-secondary" id="tiktokBtn">Connect with TikTok</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Bootstrap JS and jQuery (required for Bootstrap components) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <script>
+        $(document).ready(function() {
+            $('#settingsTab a').on('click', function (e) {
+                e.preventDefault();
+                $(this).tab('show');
+            });
+
+            $('#facebookBtn').click(function() {
+                // Implement OAuth for Facebook
+            });
+
+            $('#twitterBtn').click(function() {
+                // Implement OAuth for Twitter
+            });
+
+            $('#instagramBtn').click(function() {
+                // Implement OAuth for Instagram
+            });
+
+            $('#tiktokBtn').click(function() {
+                // Implement OAuth for TikTok
+            });
+        });
+    </script>
+</body>
+</html>
