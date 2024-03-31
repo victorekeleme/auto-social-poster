@@ -59,3 +59,7 @@ venv.bak/
 # Compiled source
 *.com
 *.clas
+
+# Folders
+migrations/
+uploads/

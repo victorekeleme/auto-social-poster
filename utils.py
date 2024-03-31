@@ -12,3 +12,9 @@ def save_media(media_file):
     media_file.save(media_path)
     
     return media_path
+
+
+# function for scheduling posts
+
+def scheduler(schedule):
+    pass

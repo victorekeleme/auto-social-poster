@@ -8,21 +8,39 @@
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 </head>
 <body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="#">Auto-Social Poster</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('register') }}">Sign up</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('about') }}">About us</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+
     <div class="container mt-5">
         <h2 class="mb-4">Login</h2>
         <!-- Display flash messages here -->
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
-                <p class="alert alert-{{ message[1] }}">{{ message[0] }}</p>
+                <p class="alert alert-info">{{ message }}</p>
                 {% endfor %}
             {% endif %}
         {% endwith %}
 
-        {% if current_user.is_authenticated %}
-            <p>Welcome, {{ current_user.username }}!</p>
-            <a href="{{ url_for('logout') }}" class="btn btn-danger">Logout</a>
-        {% else %}
             <form action="{{ url_for('login') }}" method="post">
                 <div class="form-group">
                     <label for="username">Username:</label>
@@ -34,7 +52,6 @@
                 </div>
                 <button type="submit" class="btn btn-primary">Login</button>
             </form>
-        {% endif %}
     </div>
 
     <!-- Add Bootstrap JS and Popper.js (required for some Bootstrap components) -->
