@@ -8,7 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from utils import save_media
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 
@@ -46,13 +46,15 @@ class Post(db.Model):
     post_text = db.Column(db.String(255), nullable=False)
     post_media = db.Column(db.String(255), nullable=True)
     is_published = db.Column(db.Boolean, default=False)
-    date_created = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    def __init__(self, post_text, post_media=None, is_published=False, user_id=None):
+    date_created = db.Column(db.DateTime, default=datetime.now(timezone.utc))
+    scheduled_time = db.Column(db.DateTime, nullable=True)  # Changed default to nullable
+
+    def __init__(self, post_text, post_media=None, is_published=False, user_id=None, scheduled_time=None):
         self.post_text = post_text
         self.post_media = post_media
         self.is_published = is_published
         self.user_id = user_id
+        self.scheduled_time = scheduled_time
 
 
 # Define Settings model with foreign key to User
@@ -148,9 +150,10 @@ def about():
 def add_post():
     post_text = request.form['post_text']
     post_media = request.files['post_media']
+    schedule_time_str = request.form.get('schedule_time')  # Get scheduled time from form
 
     user_id = current_user.id
-    user = User.query.filter_by(id=user_id).first()
+    user = User.query.get(user_id)  # Assuming you're using the primary key for user lookup
 
     if post_media.filename == '' and post_text == '':
         flash("No content provided.", 'failed')
@@ -160,11 +163,29 @@ def add_post():
     if post_media.filename != '':
         media_path = save_media(post_media)
 
-    new_post = Post(post_text=post_text, post_media=media_path, is_published=False, user_id=user.id)
+    if schedule_time_str:
+        try:
+            scheduled_time = datetime.strptime(schedule_time_str, '%m/%d/%Y %I:%M %p')
+        except ValueError:
+            flash("Invalid date format. Please use MM/DD/YYYY H:MM AM/PM format.", 'failed')
+            return redirect(url_for('index'))
+    else:
+        scheduled_time = None
 
+    new_post = Post(
+        post_text=post_text,
+        post_media=media_path,
+        is_published=False,
+        user_id=user.id,
+        scheduled_time=scheduled_time
+    )
 
     db.session.add(new_post)
     db.session.commit()
+
+    posts = Post.query.all()
+    for post in posts:
+        print(post.id, post.post_text, post.scheduled_time, post.date_created)
 
     flash("Post Created Successfully", 'success')
 
@@ -191,16 +212,28 @@ def delete_post(post_id):
 @login_required
 def edit_post(post_id):
     post = Post.query.filter_by(id=post_id, user_id=current_user.id).first_or_404()
-
+    
     if request.method == 'POST':
         post_text = request.form['post_text']
         post_media = request.files['post_media']
+        schedule_time_str = request.form.get('edit_schedule_time')
 
-        post.post_text = post_text
+        if schedule_time_str:
+            try:
+                scheduled_time = datetime.strptime(schedule_time_str, '%m/%d/%Y %I:%M %p')
+                print(scheduled_time)
+            except ValueError:
+                flash("Invalid date format. Please use MM/DD/YYYY H:MM AM/PM format.", 'failed')
+                return redirect(url_for('index'))
+        else:
+            scheduled_time = None
 
         if post_media.filename != '':
             media_path = save_media(post_media)
             post.post_media = media_path
+
+        post.post_text = post_text
+        post.scheduled_time = scheduled_time
 
         db.session.commit()
 
@@ -243,6 +276,26 @@ def settings():
         return redirect(url_for('settings'))
     else:
         return render_template('settings.html', user=user, settings=settings)
+
+
+@app.route('/post/<int:post_id>', methods=['GET'])
+@login_required
+def post(post_id):
+    post = Post.query.filter_by(user_id=current_user.id, id=post_id).first()
+
+    if post:
+        post.is_published = True
+        db.session.commit()
+        flash('Post published successfully.', 'success')
+    else:
+        flash('Post not found.', 'error')
+
+    return redirect(url_for('index'))
+
+
+
+
+
 
 
 
