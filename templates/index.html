@@ -49,6 +49,12 @@
             <div id="flash-container"></div>
         {% endif %}
 
+        {% for schedule in schedules %}
+            <p>schedule.user_id</p>
+            <p>schedule.post_id</p>
+            <p>schedule.schedule_time</p>
+        {% endfor %}
+
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
@@ -379,6 +385,7 @@
             });
         }
 
+
         $(document).ready(function() {
             // Display unpublished posts by default
             displayPosts("unpublished");
@@ -429,7 +436,7 @@
                 countdownElement.innerText = countdownString;
 
                 if (diff < 0) {
-                    sendPost(postId)
+                    location.reload()
                     clearInterval(intervalId)
                 }
             }, 1000);
