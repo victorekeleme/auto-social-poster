@@ -94,8 +94,10 @@
                             {% endif %}
                         </div>
                         <div>
+                            {% if post.scheduled_time %}
                             <!-- Countdown timer for scheduled posts -->
                             <span id="countdown-{{ post.id }}" class="text-dark" data-post-id="{{ post.id }}" data-scheduled-time="{{ post.scheduled_time }}"></span>
+                            {% endif %}
 
                             <!-- Button group to align buttons on the right -->
                             <div class="btn-group" role="group">
