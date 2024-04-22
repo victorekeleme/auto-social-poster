@@ -339,6 +339,7 @@ def post(post_id):
     if post:
         post.is_published = True
         db.session.commit()
+        cancel_schedule_post(post.id)
         flash('Post published successfully.', 'success')
     else:
         flash('Post not found.', 'error')
