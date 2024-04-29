@@ -1,17 +1,15 @@
-import logging
 from flask import Flask, render_template, request, redirect, url_for, send_file, flash, session, abort, jsonify
 from flask_session import Session
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_socketio import SocketIO, emit
-import asyncio
-import uuid
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from utils import save_media, schedule_post, cancel_schedule_post
+from utils import save_media, schedule_post, cancel_schedule_post, get_oauth2_session, get_refresh_token, get_user_details
 from datetime import datetime, timezone
 from flask_apscheduler import APScheduler
-import requests
+# from authlib.integrations.flask_client import OAuth
+import base64, os, requests, uuid, logging, re, hashlib, json, secrets, string
+
 
 
 app = Flask(__name__)
@@ -26,20 +24,23 @@ scheduler.start()
 app.config['SECRET_KEY'] = '_5#y2L"F4Q8z\n\xec]/'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config.from_pyfile("settings.py")
+
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 login_manager = LoginManager(app)
 
+
 # Set up logger
-logging.basicConfig(
-    filename='flask_app.log',  # Log file path
-    level=logging.INFO,  # Logging level
-    format='%(asctime)s - %(levelname)s - %(message)s',  # Log format
-)
+# logging.basicConfig(
+#     filename='flask_app.log',  # Log file path
+#     level=logging.INFO,  # Logging level
+#     format='%(asctime)s - %(levelname)s - %(message)s',  # Log format
+# )
 
 # Log a startup message
-logging.info("Flask app has started.")
+# logging.info("Flask app has started.")
 
 # User model for authentication
 class User(UserMixin, db.Model):
@@ -81,17 +82,18 @@ class Settings(db.Model):
     weekly_schedule = db.Column(db.String(255), nullable=True)
     recycle_post_after = db.Column(db.Integer, nullable=True)
 
-class Scheduler(db.Model):
+# Define a UserToken model to store OAuth tokens
+class UserToken(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'), nullable=False)
-    scheduled_time = db.Column(db.DateTime, nullable=True)
+    user_id = db.Column(db.String(100), unique=True, nullable=False)  # Platform user ID
+    username = db.Column(db.String(255), nullable=False)
+    platform = db.Column(db.String(50), nullable=False)  # Twitter, Facebook, etc.
+    access_token = db.Column(db.String(200), nullable=False)  # OAuth token
+    refresh_token = db.Column(db.String(200), nullable=True)  # Optional for some platforms
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    def __init__(self, user_id=None, post_id=None, scheduled_time=None):
-        self.user_id = user_id
-        self.post_id = post_id   
-        self.scheduled_time = scheduled_time
-
+    def __repr__(self):
+        return f'<UserToken {self.user_id} on {self.platform}>'
 
 
 # User loader function for Flask-Login
@@ -141,18 +143,48 @@ def login():
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
             flash('Logged in successfully.', 'success')
-            logging.info(f"User {current_user.id} logged in.")
+            # logging.info(f"User {current_user.id} logged in.")
             return redirect(url_for('index'))
         else:
             flash('Invalid username or password.', 'error')
-            logging.warning("Failed login attempt.")
+            # logging.warning("Failed login attempt.")
 
     return render_template('login.html')
+
+
+@app.route('/login_socials')
+def login_social():
+    # Check if session contains 'user_info' and ensure 'data' contains 'id' and 'username'
+    if 'user_info' not in session or 'data' not in session['user_info']:
+        flash("User information not found in session.", "error")
+        return redirect(url_for('login'))  # Redirect to the login page
+
+    # Get user_id and username from the session data
+    user_info = session['user_info']['data']  # Extract the inner 'data' dictionary
+    username = str(user_info['username']).lower()
+    password = ''.join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(12))
+
+    # Check for existing user
+    existing_user = User.query.filter_by(username=username).first()
+
+    if not existing_user:
+        # If the user doesn't exist, create a new one
+        new_user = User(username=username, password_hash=password) # Using random password for social login
+        db.session.add(new_user)
+        db.session.commit()
+        existing_user = new_user  # Reassign to the newly created user
+        # logging.info(f"Created new user: {username}")
+
+    # Log the user in
+    login_user(existing_user)
+    flash(f"Welcome, {username}!", "success")
+
+    return redirect(url_for('index'))
 
 @app.route('/logout')
 @login_required
 def logout():
-    logging.info(f"User {current_user.id} is logging out.")
+    # logging.info(f"User {current_user.id} is logging out.")
 
     logout_user()
     flash('Logged out successfully.', 'success')
@@ -163,7 +195,7 @@ def logout():
 @app.route('/')
 @login_required  # Ensure only logged-in users can access this route
 def index():
-    logging.info(f"User {current_user.id} accessing the index.")
+    # logging.info(f"User {current_user.id} accessing the index.")
 
     user = current_user  # Get the current logged-in user object
     
@@ -172,9 +204,7 @@ def index():
     # Get all unpublished posts
     unpublished_posts = Post.query.filter_by(user_id=user.id, is_published=False).all()
 
-    schedules = Scheduler.query.all()
-
-    return render_template('index.html', user=user, published_posts=published_posts, unpublished_posts=unpublished_posts, schedules=schedules)
+    return render_template('index.html', user=user, published_posts=published_posts, unpublished_posts=unpublished_posts)
 
 @app.route('/about')
 def about():
@@ -184,7 +214,7 @@ def about():
 @app.route('/add', methods=['POST'])
 @login_required
 def add_post():
-    logging.info(f"User {current_user.id} is adding a new post.")
+    # logging.info(f"User {current_user.id} is adding a new post.")
     post_text = request.form['post_text']
     post_media = request.files['post_media']
     schedule_time_str = request.form.get('schedule_time')  # Get scheduled time from form
@@ -194,7 +224,7 @@ def add_post():
 
     if post_media.filename == '' and post_text == '':
         flash("No content provided.", 'failed')
-        logging.warning("Failed to add post: No content provided.")
+        # logging.warning("Failed to add post: No content provided.")
         return redirect(url_for('index'))
 
     media_path = ""
@@ -221,7 +251,7 @@ def add_post():
     db.session.add(new_post)
     db.session.commit()
 
-    logging.info(f"Post {new_post.id} created by user {current_user.id}")
+    # logging.info(f"Post {new_post.id} created by user {current_user.id}")
 
 
     posts = Post.query.all()
@@ -237,7 +267,7 @@ def add_post():
 @app.route('/delete/<int:post_id>', methods=['GET', 'POST'])
 @login_required
 def delete_post(post_id):
-    logging.info(f"User {current_user.id} is attempting to delete post {post_id}")
+    # logging.info(f"User {current_user.id} is attempting to delete post {post_id}")
     post = Post.query.filter_by(id=post_id, user_id=current_user.id).first_or_404()
 
     try:
@@ -245,11 +275,11 @@ def delete_post(post_id):
         db.session.commit()
         cancel_schedule_post(post.id)
         flash('Post deleted successfully.', 'success')
-        logging.info(f"Post {post_id} deleted by user {current_user.id}")
+        # logging.info(f"Post {post_id} deleted by user {current_user.id}")
     except Exception as e:
         db.session.rollback()
         flash('An error occurred while deleting the post.', 'error')
-        logging.error(f"Error deleting post {post_id}: {e}")
+        # logging.error(f"Error deleting post {post_id}: {e}")
 
 
     return redirect(url_for('index'))
@@ -258,7 +288,7 @@ def delete_post(post_id):
 @app.route('/edit/<int:post_id>', methods=['POST'])
 @login_required
 def edit_post(post_id):
-    logging.info(f"User {current_user.id} is attempting to edit post {post_id}")
+    # logging.info(f"User {current_user.id} is attempting to edit post {post_id}")
     post = Post.query.filter_by(id=post_id, user_id=current_user.id).first_or_404()
     
     if request.method == 'POST':
@@ -272,7 +302,7 @@ def edit_post(post_id):
                 print(scheduled_time)
             except ValueError:
                 flash("Invalid date format. Please use MM/DD/YYYY H:MM AM/PM format.", 'failed')
-                logging.error(f"Failed to schedule post {post_id}: Invalid date format.")
+                # logging.error(f"Failed to schedule post {post_id}: Invalid date format.")
                 return redirect(url_for('index'))
         else:
             scheduled_time = None
@@ -289,7 +319,7 @@ def edit_post(post_id):
         db.session.commit()
 
         flash("Post updated successfully", 'success')
-        logging.info(f"Post {post_id} edited by user {current_user.id}")
+        # logging.info(f"Post {post_id} edited by user {current_user.id}")
 
 
     return redirect(url_for('index'))
@@ -395,6 +425,73 @@ def list_scheduled_tasks():
     jobs = scheduler.get_jobs()
     jobs_info = [{"id": job.id, "task_run_time": str(job.next_run_time)} for job in jobs]
     return jsonify(jobs_info)
+
+
+
+
+### Socials login integreation #####
+@app.route("/login_twitter")
+def login_twitter():
+    global twitter
+    global code_verifier
+
+    twitter = get_oauth2_session(app.config.get("CLIENT_ID"),
+                                 app.config.get("REDIRECT_URI"),
+                                 ["tweet.read", "users.read", "follows.read",
+                                  "offline.access"])
+
+    code_verifier = base64.urlsafe_b64encode(os.urandom(30)).decode("utf-8")
+    code_verifier = re.sub("[^a-zA-Z0-9]+", "", code_verifier)
+    code_challenge = hashlib.sha256(code_verifier.encode("utf-8")).digest()
+    code_challenge = base64.urlsafe_b64encode(code_challenge).decode("utf-8")
+    code_challenge = code_challenge.replace("=", "")
+
+    authorization_url, state = twitter.authorization_url(
+        "https://twitter.com/i/oauth2/authorize",
+        code_challenge=code_challenge,
+        code_challenge_method="S256"
+    )
+    session["oauth_state"] = state
+
+    return redirect(authorization_url)
+
+@app.route("/oauth/callback", methods=["GET"])
+def callback():
+    code = request.args.get("code")
+
+    token = twitter.fetch_token(
+        token_url=app.config.get("TOKEN_URL"),
+        client_secret=app.config.get("CLIENT_SECRET"),
+        code_verifier=code_verifier,
+        code=code,
+    )
+
+    refresh_token = get_refresh_token(twitter, app.config, token["refresh_token"])
+    user_info = get_user_details(refresh_token['access_token'])
+
+    print(user_info)
+
+    # Store token in the database
+    user_id = user_info['data']['id']
+    username = user_info['data']['username']
+    existing_user = UserToken.query.filter_by(user_id=user_id).first()
+
+    if not existing_user:
+        user_token = UserToken(
+            user_id=user_id,
+            username=username,
+            platform='twitter',
+            access_token=refresh_token['access_token'],
+            refresh_token=refresh_token['refresh_token'],  # Some platforms use refresh tokens
+            created_at=datetime.utcnow()
+        )
+        db.session.add(user_token)  # Add the token to the database
+        db.session.commit()  # Commit the transaction
+    
+    session['user_info'] = user_info  # Store user info in the session
+
+    return redirect(url_for('login_social'))
+
 
 
 if __name__ == '__main__':

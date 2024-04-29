@@ -63,3 +63,6 @@ venv.bak/
 # Folders
 migrations/
 uploads/
+
+# config files
+settings.py

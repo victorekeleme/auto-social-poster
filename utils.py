@@ -1,7 +1,52 @@
 import os
+import base64
+from datetime import datetime
 from werkzeug.utils import secure_filename
 import requests
-from datetime import datetime
+from requests_oauthlib import OAuth2Session
+import settings
+
+
+
+def get_oauth2_session(client_id, redirect_uri, scopes):
+    return OAuth2Session(client_id, redirect_uri=redirect_uri, scope=scopes)
+
+
+def get_refresh_token(oauth2_session, config, refresh_token):
+    basic_auth = base64.b64encode(
+        str.encode(f'{config.get("CLIENT_ID")}:'
+                   f'{config.get("CLIENT_SECRET")}'))
+    basic_auth = \
+        basic_auth.decode('ascii')
+
+    headers = {
+        'Content-Type': "application/x-www-form-urlencoded",
+        'Authorization': f'Basic {basic_auth}'
+    }
+
+    refreshed_token = oauth2_session.refresh_token(
+        client_id=config.get("CLIENT_ID"),
+        client_secret=config.get("CLIENT_SECRET"),
+        token_url=config.get("TOKEN_URL"),
+        headers=headers,
+        refresh_token=refresh_token,
+    )
+
+    return refreshed_token
+
+
+def get_user_details(token):
+    response = requests.get(
+        "https://api.twitter.com/2/users/me",
+        headers={
+            "Authorization": "Bearer {}".format(token),
+            "Content-Type": "application/json",
+        },
+        params={"user.fields": "username"}
+    )
+
+    return response.json()
+
 
 
 def save_media(media_file):
