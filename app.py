@@ -49,6 +49,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(100), nullable=False)
     posts = db.relationship('Post', backref='users_post', lazy=True)
+    socials = db.relationship('UserToken', backref='users_social', lazy=True)
 
     def __init__(self, username, password_hash):
         self.username = username
@@ -84,10 +85,11 @@ class Settings(db.Model):
 
 # Define a UserToken model to store OAuth tokens
 class UserToken(db.Model):
+    __tablename__ = 'user_tokens'
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.String(100), unique=True, nullable=False)  # Platform user ID
-    username = db.Column(db.String(255), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     platform = db.Column(db.String(50), nullable=False)  # Twitter, Facebook, etc.
+    platform_username = db.Column(db.String(255), nullable=False)
     access_token = db.Column(db.String(200), nullable=False)  # OAuth token
     refresh_token = db.Column(db.String(200), nullable=True)  # Optional for some platforms
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -120,6 +122,7 @@ def register():
 
         # Hash the password
         hashed_password = generate_password_hash(password)
+        print(hashed_password)
 
         # Create a new user
         new_user = User(username=username, password_hash=hashed_password)
@@ -138,10 +141,20 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
 
+        # Check for missing or empty data
+        if not username:
+            flash("Username is required.", "error")
+            return render_template("login.html")  # Return to the login page with error message
+        
+        if not password:
+            flash("Password is required.", "error")
+            return render_template("login.html")  # Return to the login page with error message
+
         user = User.query.filter_by(username=username).first()
 
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
+            session['user_id'] = user.id
             flash('Logged in successfully.', 'success')
             # logging.info(f"User {current_user.id} logged in.")
             return redirect(url_for('index'))
@@ -154,15 +167,17 @@ def login():
 
 @app.route('/login_socials')
 def login_social():
-    # Check if session contains 'user_info' and ensure 'data' contains 'id' and 'username'
-    if 'user_info' not in session or 'data' not in session['user_info']:
+    # Check if session contains 'user_data' and ensure 'data' contains 'id' and 'username'
+    if 'data' not in session:
         flash("User information not found in session.", "error")
         return redirect(url_for('login'))  # Redirect to the login page
 
     # Get user_id and username from the session data
-    user_info = session['user_info']['data']  # Extract the inner 'data' dictionary
-    username = str(user_info['username']).lower()
+    user_data = session['data']  # Extract the 'data' dictionary
+    user_id = user_data['id']
+    username = str(user_data['username']).lower()
     password = ''.join(secrets.choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(12))
+
 
     # Check for existing user
     existing_user = User.query.filter_by(username=username).first()
@@ -174,6 +189,8 @@ def login_social():
         db.session.commit()
         existing_user = new_user  # Reassign to the newly created user
         # logging.info(f"Created new user: {username}")
+
+    session['user_id'] = user_id
 
     # Log the user in
     login_user(existing_user)
@@ -328,9 +345,11 @@ def edit_post(post_id):
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 def settings():
-    user_id = current_user.id
+    user_id = session['user_id']
     user = User.query.filter_by(id=user_id).first()  # Retrieve the user object from the database
     settings = Settings.query.filter_by(user_id=user_id).first()
+    user_tokens = UserToken.query.filter_by(user_id=user_id).all()
+    print(user_id)
 
     if request.method == 'POST':
         # Process form data
@@ -358,7 +377,7 @@ def settings():
         flash("Settings saved successfully", 'success')
         return redirect(url_for('settings'))
     else:
-        return render_template('settings.html', user=user, settings=settings)
+        return render_template('settings.html', user=user, settings=settings, user_tokens=user_tokens)
 
 
 @app.route('/post/<int:post_id>', methods=['GET'])
@@ -377,7 +396,7 @@ def post(post_id):
     return redirect(url_for('index'))
 
 
-# Scheduling API
+#### Scheduling API #####
 def send_schedule_post(post_id):
     print("posting")
     # Ensure correct context and database connection
@@ -427,8 +446,6 @@ def list_scheduled_tasks():
     return jsonify(jobs_info)
 
 
-
-
 ### Socials login integreation #####
 @app.route("/login_twitter")
 def login_twitter():
@@ -436,7 +453,7 @@ def login_twitter():
     global code_verifier
 
     twitter = get_oauth2_session(app.config.get("CLIENT_ID"),
-                                 app.config.get("REDIRECT_URI"),
+                                 app.config.get("TWITTER_LOGIN_REDIRECT_URI"),
                                  ["tweet.read", "users.read", "follows.read",
                                   "offline.access"])
 
@@ -455,8 +472,8 @@ def login_twitter():
 
     return redirect(authorization_url)
 
-@app.route("/oauth/callback", methods=["GET"])
-def callback():
+@app.route("/oauth/callback/login_twitter", methods=["GET"])
+def twitter_login_callback():
     code = request.args.get("code")
 
     token = twitter.fetch_token(
@@ -467,31 +484,94 @@ def callback():
     )
 
     refresh_token = get_refresh_token(twitter, app.config, token["refresh_token"])
-    user_info = get_user_details(refresh_token['access_token'])
+    user_data = get_user_details(refresh_token['access_token'])
 
-    print(user_info)
+    print(refresh_token)
+    print(user_data)
 
     # Store token in the database
-    user_id = user_info['data']['id']
-    username = user_info['data']['username']
-    existing_user = UserToken.query.filter_by(user_id=user_id).first()
+    twitter_user_id = user_data['data']['id']
+    twitter_username = user_data['data']['username']
+    existing_twitter_user = UserToken.query.filter_by(user_id=twitter_user_id).first()
 
-    if not existing_user:
+    if not existing_twitter_user:
         user_token = UserToken(
-            user_id=user_id,
-            username=username,
+            user_id = twitter_user_id,
+            platform_username=twitter_username,
             platform='twitter',
             access_token=refresh_token['access_token'],
-            refresh_token=refresh_token['refresh_token'],  # Some platforms use refresh tokens
+            refresh_token=refresh_token['refresh_token'],
             created_at=datetime.utcnow()
         )
-        db.session.add(user_token)  # Add the token to the database
-        db.session.commit()  # Commit the transaction
-    
-    session['user_info'] = user_info  # Store user info in the session
+        db.session.add(user_token) 
+        db.session.commit()
+
+    session['data'] = user_data['data']
 
     return redirect(url_for('login_social'))
 
+
+@app.route("/get_twitter_token")
+def get_twitter_token():
+    global twitter
+    global code_verifier
+
+    twitter = get_oauth2_session(app.config.get("CLIENT_ID"),
+                                 app.config.get("TWITTER_TOKEN_REDIRECT_URI"),
+                                 ["tweet.read", "users.read", "follows.read",
+                                  "offline.access"])
+
+    code_verifier = base64.urlsafe_b64encode(os.urandom(30)).decode("utf-8")
+    code_verifier = re.sub("[^a-zA-Z0-9]+", "", code_verifier)
+    code_challenge = hashlib.sha256(code_verifier.encode("utf-8")).digest()
+    code_challenge = base64.urlsafe_b64encode(code_challenge).decode("utf-8")
+    code_challenge = code_challenge.replace("=", "")
+
+    authorization_url, state = twitter.authorization_url(
+        "https://twitter.com/i/oauth2/authorize",
+        code_challenge=code_challenge,
+        code_challenge_method="S256"
+    )
+    session["oauth_state"] = state
+
+    return redirect(authorization_url)
+
+@app.route("/oauth/callback/get_twitter_token", methods=["GET"])
+def get_twitter_token_callback():
+    code = request.args.get("code")
+
+    token = twitter.fetch_token(
+        token_url=app.config.get("TOKEN_URL"),
+        client_secret=app.config.get("CLIENT_SECRET"),
+        code_verifier=code_verifier,
+        code=code,
+    )
+
+    refresh_token = get_refresh_token(twitter, app.config, token["refresh_token"])
+    user_data = get_user_details(refresh_token['access_token'])
+
+    print(user_data)
+
+    # Store token in the database
+    app_user_id = session.get('user_id') # twitter user_id or any user_id
+    # twitter_user_id = user_data['data']['id']
+    twitter_username = user_data['data']['username']
+    existing_twitter_user = UserToken.query.filter_by(user_id=app_user_id).first()
+
+    if not existing_twitter_user:
+        user_token = UserToken(
+            user_id = app_user_id,
+            platform_username=twitter_username,
+            platform='twitter',
+            access_token=refresh_token['access_token'],
+            refresh_token=refresh_token['refresh_token'],
+            created_at=datetime.utcnow()
+        )
+        db.session.add(user_token)
+        db.session.commit()
+        flash (f"{twitter_username} user token added successfully")
+
+    return redirect(url_for('settings'))
 
 
 if __name__ == '__main__':

@@ -94,13 +94,36 @@
                     <button type="submit" class="btn btn-primary">Save</button>
                 </form>
             </div>
-            <div class="tab-pane fade" id="accounts" role="tabpanel" aria-labelledby="accounts-tab">
-                <h4>Connect Accounts</h4>
+        <!-- Accounts tab showing connected social accounts -->
+        <div class="tab-pane fade" id="accounts" role="tabpanel" aria-labelledby="accounts-tab">
+            <!-- Connect to social media accounts -->
+            <h4 class="mt-3">Connect New Accounts</h4>
+            <div class="btn-group" role="group" aria-label="Connect to social media">
                 <button type="button" class="btn btn-primary" id="facebookBtn">Connect with Facebook</button>
-                <button type="button" class="btn btn-info" id="twitterBtn">Connect with Twitter</button>
+                <a href="{{ url_for('get_twitter_token') }}" class="btn btn-info" role="button">Connect with Twitter</a>
                 <button type="button" class="btn btn-danger" id="instagramBtn">Connect with Instagram</button>
                 <button type="button" class="btn btn-secondary" id="tiktokBtn">Connect with TikTok</button>
             </div>
+
+            <!-- List of connected social accounts -->
+            <h4 class="mt-4">Connected Social Accounts</h4>
+            <ul class="list-group">
+                {% if user_tokens and user_tokens | length > 0 %}
+                    {% for token in user_tokens %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>{{ token.platform }}: {{ token.platform_username }}</span>
+                            <!-- Disconnect button -->
+                            <button type="button" class="btn btn-danger btn-sm" title="Disconnect">Disconnect</button>
+                            <!-- <button type="button" class="btn btn-danger btn-sm" title="Disconnect" onclick="disconnectToken('{{ token.platform_user_id }}')">Disconnect</button> -->
+                        </li>
+                    {% endfor %}
+                {% else %}
+                    <li class="list-group-item text-muted">No connected accounts.</li>
+                {% endif %}
+            </ul>
+        </div>
+
+
         </div>
     </div>
 
